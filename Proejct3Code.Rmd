@@ -1,0 +1,101 @@
+---
+title: "Project 3: US Traffic Fatalities"
+date: "February 11th 2020"
+output: html_document
+---
+
+## Overview
+
+This document contains instructions on Project 3 for STA 207 in Winter 2020. This document is made with `R markdown`. The `rmd` file to generate this document is available on the course website. 
+
+## Background
+
+The National Highway Traffic Safety Administration reported that there are 36,560 highway fatalities across US in 2018 ([link](nhtsa.gov/press-releases/roadway-fatalities-2018-fars)). 
+Alarmed by the high traffic fatalities, you wanted to use your knowledge and skills in statistics to explore measures that can potentially reduce the traffic fatalities. 
+
+You found out that traffic fatalities data for 48 US states from 1982 to 1988 are available, and well-cleaned, in an `R` package `AER`. You can see more description of the data set from the help file of the `Fatalities` dataset (e.g., using `?Fatalities`).
+
+
+You want to analyze this dataset to see if there are any of the variables that **caused** the reduction or increase of traffic fatalities.
+
+**<span style="color:red"> Note that the ultimate goal is to make suggestions to policymakers to take certain measures.</span>**
+
+* The beer tax is the tax on a case of beer, which is an available measure of state alcohol taxes more generally. 
+
+* The drinking age variable is a factor indicating whether the legal drinking age is 18, 19, or 20. 
+
+* The two binary punishment variables describe the state's minimum sentencing requirements for an initial drunk driving conviction.
+
+* Total vehicle miles traveled annually by state was obtained from the Department of Transportation. 
+
+* Personal income was obtained from the US Bureau of Economic Analysis
+
+* The unemployment rate was obtained from the US Bureau of Labor Statistics
+
+
+
+## Tasks 
+```{r, message=FALSE}
+library(AER)
+library("plm")
+```
+1.  Explore this dataset and generate summary statistics (in forms of tables or plots) that you find crucial for your own interest, or for convincing the policymakers. 
+
+```{r}
+data("Fatalities")
+## deal with missing value
+## by reference it is actually no
+Fatalities$jail[Fatalities$state=="ca" & Fatalities$year=="1988"]="no"
+Fatalities$service[Fatalities$state=="ca" & Fatalities$year=="1988"]="no"
+
+## add fatality rate (number of traffic deaths
+## per 10,000 people living in that state in that year)
+Fatalities$frate <- with(Fatalities, fatal/pop * 10000)
+## add discretized version of minimum legal drinking age
+Fatalities$drinkagec <- cut(Fatalities$drinkage,
+  breaks = 18:22, include.lowest = TRUE, right = FALSE)
+Fatalities$drinkagec <- relevel(Fatalities$drinkagec, ref = 4)
+```
+
+```{r}
+dim(Fatalities)
+str(Fatalities)
+```
+2.  Consider only the full dataset from 1982 to 1988, propose a regression model to study whether having a mandatory jail sentence is associated with reduced traffic fatalities. In particular, you need to 
+    a.  specify your model,
+    b.  state the assumptions required,
+    c.  fit the model with appropriate methods,
+    d.  conduct model diagnostics and/or sensitivity analysis,
+    e.  and discuss causal interpretation of the proposed models. 
+
+```{r}
+fem_jail <- plm(frate ~ jail, data = Fatalities,
+  index = c("state", "year"), model = "within", effect = "twoways")
+coeftest(fem_jail, vcov = vcovHC) 
+```
+
+```{r}
+fem_full <- plm(frate ~ beertax + year + drinkagec + jail + service
+                +miles + unemp + log(income),
+                index = c("state", "year"),
+                model = "within",
+                effect = "twoways",
+                data = Fatalities)
+summary(fem_full)
+```
+
+The jail is not fucking significant. 
+
+3.  Conclude your analysis results. You may want to test a hypothesis, construct a confidence interval, or draw a confidence band. 
+
+4.  Explain the implications of your results to policymakers who know little about statistics. Make suggestions if you want to. 
+
+## Hints
+
+1.  Take a look at the help file for the `Fatalities` dataset.(e.g., using `?Fatalities`)
+2.  You may want to think about the causal interpretation (2.e) before finding an appropriate model (2.a).
+**<span style="color:red">You need to cite literatures to justify your answer.</span>** 
+3.  keywords: longitudinal data, time-series data, propensity score, matching, instrument variable, and observational study. 
+**<span style="color:red">Not all keywords lead to useful resources.</span>** 
+4.  You may use additional data or studies to strengthen your argument in Task 4.
+
